@@ -43,3 +43,24 @@ suspend fun makeNetworkRequest() {
 
 suspend fun slowFetch(): SlowResult { ... }
 ```
+
+
+<br>
+<br>
+<br>
+Kotlin에서 모든 coroutines은 CoroutineScope 내에서 실행된다. Scope는 그것의 Job을 통해서 coroutines의 lifetime을 컨트롤한다. 특정 scope의 job을 취소할 때, 그것은 scope안에서 시작 된 모든 coroutines를 취소한다. 안드로이드 상에서 모든 실행 중인 coroutines을 취소하기 위해서 scope를 사용할 수 있다. 예를들어 사용자가 activity 또는 fragment에서 벗어나는 경우
+
+또한 Scope는 default dispatcher 명시를 허용한다. dispatcher는 어떤 thread가 coroutines을 운영할지 컨트롤 할 수 있다.
+```
+private val viewModelJob = Job()
+
+private val uiScope = CoroutineScope(Dispatchers.Main + viewModelJob)
+```
+
+uiScope는 안드로이드 상의 main thread인 Dispatcher.Main에서 coroutines을 시작할 것이다.
+main thread에서 시작 된 coroutine은 suspended 동안 main thread를 block하지 않을 것이다.
+coroutine은 시작 된 후에 언제든지 dispatcher들을 전환 할 수있다. 예를 들면 한 coroutine이 main dispatcher 위에서 시작될 수 있고 main thread의 결과인 large JSON을 parsing하기 위해서 또다른 dispatcher를 사용할 수 있다.
+
+- scope에서 시작 된 모든 coroutines를 취소하기 위해서는 CoroutineScope에 Job을 설정해야 한다.
+
+- CoroutineScope contructor로 생성 된 scopes는 암시적인 job을 추가하는데 이는 uiScope.coroutineContext.cancel()로 취소할 수 있다.
