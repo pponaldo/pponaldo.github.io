@@ -64,3 +64,57 @@ coroutine은 시작 된 후에 언제든지 dispatcher들을 전환 할 수있�
 - scope에서 시작 된 모든 coroutines를 취소하기 위해서는 CoroutineScope에 Job을 설정해야 한다.
 
 - CoroutineScope contructor로 생성 된 scopes는 암시적인 job을 추가하는데 이는 uiScope.coroutineContext.cancel()로 취소할 수 있다.
+
+
+<br>
+<br>
+*Converting existing callback API with coroutines*
+
+- callback pattern
+```
+fun refreshTitle(/* ... */) {
+   val call = network.fetchNewWelcome()
+   call.addOnResultListener { result ->
+       // callback called when network request completes or errors
+       when (result) {
+           is FakeNetworkSuccess<String> -> {
+               // process successful result
+           }
+           is FakeNetworkError -> {
+               // process network error
+           }
+       }
+   }
+}
+```
+
+- coroutines
+suspend function extension *await()* 만들기
+```
+suspend fun <T> FakeNetworkCall<T>.await(): T {
+   return suspendCoroutine { continuation ->
+       addOnResultListener { result ->
+           when (result) {
+               is FakeNetworkSuccess<T> -> continuation.resume(result.data)
+               is FakeNetworkError -> continuation.resumeWithException(result.error)
+           }
+       }
+   }
+}
+```
+
+아래와 같이 await을 사용할 수 있다.
+```
+// Example usage of await
+
+suspend fun exampleAwaitUsage() {
+   try {
+       val call = network.fetchNewWelcome()
+       // suspend until fetchNewWelcome returns a result or throws an error
+       val result = call.await()
+       // resume will cause await to return the network result
+   } catch (error: FakeNetworkException) {
+       // resumeWithException will cause await to throw the error
+   }
+}
+```
