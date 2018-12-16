@@ -4,7 +4,10 @@ date: 2018-12-12 01:26:00 -0400
 categories: development
 ---
 
-**Coroutines in Kotlin**
+Coroutines in Kotlin
+====================
+_[Coroutine Codelab](https://codelabs.developers.google.com/codelabs/kotlin-coroutines)
+을 기반으로 개인 학습을 위한 부분적인 번역 및 학습내용을 기록합니다._
 
 오랜 시간이 소요되는 작업을 main thread에 blocking없이 수행하는 한가지 방법은 callback이다. callback 패턴으로 장시간 걸리는 작업을 background thread에서 시작할 수 있다. 해당 작업이 끝날 때 그 callback이 호출되어서 작업의 결과를 main thread에 알려준다.
 
@@ -68,9 +71,11 @@ coroutine은 시작 된 후에 언제든지 dispatcher들을 전환 할 수있�
 
 <br>
 <br>
-*Converting existing callback API with coroutines*
+## Converting existing callback API with coroutines
 
 - callback pattern
+<br>
+아래 코드에서 fetchNewWelcome function은 FakeNetworkCall을 리턴한다. 호출되면 network요청을 다른 thread에서 수행하고 그 결과를 addOnResultListener로 등록 된 listener에 전달한다.
 ```
 fun refreshTitle(/* ... */) {
    val call = network.fetchNewWelcome()
@@ -90,6 +95,12 @@ fun refreshTitle(/* ... */) {
 
 - coroutines
 suspend function extension *await()* 만들기
+<br>extension function을 만들어서 FakeNetworkCall Class 원본에는 수정없이 coroutine을 지원하는 await function을 만들수 있다.
+
+
+suspendCoroutine호출은 즉각적으로 현재의 coroutine을 suspend하고 해당 coroutine을 resume할 수 있는 *continuation* object를 줄 것이다. continuation은 suspended coroutine을 continue, resume을 위해 필요로하는 모든 context를 가지고있다.
+
+>suspendCoroutine은 cacellation을 지원하지 않아서 cancellation을 전달을 지원하기 위해서는 suspendCancellationCoroutine을 사용해야한다.
 ```
 suspend fun <T> FakeNetworkCall<T>.await(): T {
    return suspendCoroutine { continuation ->
@@ -103,7 +114,8 @@ suspend fun <T> FakeNetworkCall<T>.await(): T {
 }
 ```
 
-아래와 같이 await을 사용할 수 있다.
+아래와 같이 await function을 호출해서 sequential하게 코드를 작성할 수 있다.
+
 ```
 // Example usage of await
 
@@ -118,3 +130,42 @@ suspend fun exampleAwaitUsage() {
    }
 }
 ```
+
+## Testing Coroutine Directly
+
+await function의 unit test를 진행하면 아래와 같은 compile error를 만나게 된다.
+```
+@Test(expected = FakeNetworkException::class)
+fun whenFakeNetworkCallFailure_throws() {
+    val subject = makeFailureCall(FakeNetworkException("the error"))
+
+    subject.await() // Compiler error: Can't call outside of coroutine
+}
+```
+await function은 suspend funtion이므로 일반적인 Kotlin에서는 호출 할 수 없기 때문이다.
+따라서 테스트를 위해서는 CoroutineScope를 사용해서 coroutine을 launch해야하지만
+위의 test function whenFakeNetworkCallFailure_throws은 바로 return을 하고 exception을 캐치할 수 없기 때문에 항상 fail이다.
+
+이를 위해서 kotlin은 suspend function이 호출되는 동안 block할 수 있는 runBlocking이 존재한다. 이 호출을 통해서 suspend function을 일반적인 function처럼 block할 수 있다.
+
+따라서 아래와 같이 runBlocking호출로 unit test를 할 수 있다.
+```
+@Test(expected = FakeNetworkException::class)
+fun whenFakeNetworkCallFailure_throws() {
+   val subject = makeFailureCall(FakeNetworkException("the error"))
+
+   runBlocking {
+       subject.await()
+   }
+}
+```
+
+...ing
+
+## Using Couroutines on a worker thread
+
+
+## Using coroutines in higher order functions
+
+
+## Using coroutines with WorkManager
